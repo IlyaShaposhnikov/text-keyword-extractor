@@ -7,8 +7,8 @@ import pandas as pd
 import numpy as np
 from typing import List, Tuple
 import nltk
-from nltk.tokenize import word_tokenize
 import logging
+import re
 
 # Путь к датасету
 DEFAULT_DATA_PATH = 'data/bbc_text_cls.csv'
@@ -65,8 +65,19 @@ class KeywordExtractor:
 
     def preprocess_text(self, text: str) -> List[str]:
         """Предварительная обработка текста."""
-        # Приводим текст к нижнему регистру и разбиваем на токены (слова)
-        return word_tokenize(text.lower())
+        # Приводим к нижнему регистру
+        text = text.lower()
+
+        # Удаляем цифры и специальные символы, оставляем только буквы
+        text = re.sub(r'[^a-zA-Z\s]', ' ', text)
+
+        # Разбиваем на слова
+        tokens = text.split()
+
+        # Фильтруем короткие слова
+        tokens = [token for token in tokens if len(token) > 2]
+
+        return tokens
 
     def build_vocabulary(self) -> None:
         """

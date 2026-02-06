@@ -71,22 +71,33 @@ def compare_with_sklearn(
 
         print("\nСравнение с sklearn TF-IDF...")
 
-        # Получаем все тексты для обучения векторайзера
+        # Получаем все тексты
         all_texts = extractor.df['text'].tolist()
 
-        # Создаем и обучаем векторайзер
+        # Вариант 1: Используем sklearn с параметрами, которые
+        # максимально приближены к ручной реализации
+        # Создаем векторайзер
         vectorizer = TfidfVectorizer(
             lowercase=True,
             tokenizer=extractor.preprocess_text,
             # Отключаем стандартную токенизацию
-            token_pattern=None
+            token_pattern=None,
+            # Отключаем сглаживание IDF
+            smooth_idf=False,
+            # Отключаем нормализацию L2
+            norm=None,
+            # Используем обычную TF
+            sublinear_tf=False,
+            # Минимальная длина документа для DF
+            min_df=1,
+            # Максимальная DF (все документы)
+            max_df=1.0
         )
 
+        # Обучаем векторайзер
         tfidf_matrix_sklearn = vectorizer.fit_transform(all_texts)
-
         # Получаем TF-IDF веса для выбранного документа
         doc_tfidf_sklearn = tfidf_matrix_sklearn[doc_index]
-
         # Получаем названия признаков (слов)
         feature_names = vectorizer.get_feature_names_out()
 
@@ -102,11 +113,16 @@ def compare_with_sklearn(
 
         # Выводим сравнение
         print("\n" + "=" * 60)
-        print("СРАВНЕНИЕ РЕАЛИЗАЦИЙ TF-IDF")
+        print("СРАВНЕНИЕ РЕАЛИЗАЦИЙ TF-IDF (настроено для сопоставимости)")
         print("=" * 60)
+        print("\nПараметры sklearn:")
+        print("• smooth_idf=False (без сглаживания IDF)")
+        print("• norm=None (без L2 нормализации)")
+        print("• sublinear_tf=False (обычная TF)")
+        print("• tokenizer=NLTK word_tokenize")
 
-        print(f"\n{'Ручная реализация':<40} {'Sklearn реализация':<40}")
-        print(f"{'-'*40:<40} {'-'*40:<40}")
+        print(f"\n{'Ручная реализация':<30} {'Sklearn реализация':<30}")
+        print(f"{'-'*30:<30} {'-'*30:<30}")
 
         for i in range(10):
             extractor_word = (
@@ -131,23 +147,86 @@ def compare_with_sklearn(
                 else 0
             )
 
-            print(f"{i+1:2}. {extractor_word:<20} {extractor_weight:<15.4f} | "
-                  f"{sklearn_word:<20} {sklearn_weight:<15.4f}")
+            print(f"{i+1:2}. {extractor_word:<20} {extractor_weight:<8.4f} | "
+                  f"{sklearn_word:<20} {sklearn_weight:<8.4f}")
 
-        # Считаем количество совпадающих слов в топ-10
-        extractor_words_set = set(word for word, _ in extractor_keywords)
-        sklearn_words_set = set(word for word, _ in sklearn_keywords)
-        common_words = extractor_words_set.intersection(sklearn_words_set)
+        # Вариант 2: Сравнение с настройками sklearn по умолчанию
+        print("\n\n" + "=" * 60)
+        print("СРАВНЕНИЕ: настройки sklearn по умолчанию")
+        print("=" * 60)
 
-        print(f"\nСовпадающих слов в топ-10: {len(common_words)}")
-        if common_words:
-            print(f"Совпадающие слова: {', '.join(sorted(common_words))}")
+        # Создаем векторайзер
+        vectorizer_default = TfidfVectorizer(
+            lowercase=True,
+            tokenizer=extractor.preprocess_text,
+            # Отключаем стандартную токенизацию
+            token_pattern=None
+        )
+
+        # Обучаем векторайзер
+        tfidf_default = vectorizer_default.fit_transform(all_texts)
+        # Получаем TF-IDF веса для выбранного документа
+        doc_tfidf_default = tfidf_default[doc_index]
+        # Получаем названия признаков (слов)
+        features_default = vectorizer_default.get_feature_names_out()
+        # Сортируем слова по TF-IDF весу
+        sorted_indices_default = doc_tfidf_default.toarray()[0].argsort()[::-1]
+
+        print(f"\n{'Ручная реализация':<30} {'Sklearn (по умолчанию)':<30}")
+        print(f"{'-'*30:<30} {'-'*30:<30}")
+
+        for i in range(10):
+            extractor_word = (
+                extractor_keywords[i][0]
+                if i < len(extractor_keywords)
+                else ""
+            )
+            extractor_weight = (
+                extractor_keywords[i][1]
+                if i < len(extractor_keywords)
+                else 0
+            )
+
+            default_idx = (
+                sorted_indices_default[i]
+                if i < len(sorted_indices_default)
+                else 0
+            )
+            default_word = (
+                features_default[default_idx]
+                if i < len(features_default)
+                else ""
+            )
+            default_weight = (
+                doc_tfidf_default[0, default_idx]
+                if i < len(features_default)
+                else 0
+            )
+
+            print(f"{i+1:2}. {extractor_word:<20} {extractor_weight:<8.4f} | "
+                  f"{default_word:<20} {default_weight:<8.4f}")
+
+        # Объяснение различий
+        print("\n" + "=" * 60)
+        print("ПОЧЕМУ РЕЗУЛЬТАТЫ РАЗЛИЧАЮТСЯ:")
+        print("=" * 60)
+        print("1. Формула IDF:")
+        print("   • Ручная реализация: idf = log(N / df)")
+        print("   • Sklearn (по умолчанию): idf = log((1 + N) / (1 + df)) + 1")
+        print("   • Sklearn (smooth_idf=False): idf = log(N / df) + 1")
+        print("\n2. Нормализация:")
+        print("   • Ручная реализация: нет нормализации")
+        print("   • Sklearn (по умолчанию): L2 нормализация")
+        print("\n3. TF обработка:")
+        print("   • Ручная реализация: raw counts")
+        print("   • Sklearn (по умолчанию): raw counts")
+        print("   • Sklearn (sublinear_tf=True): 1 + log(TF)")
 
     except ImportError:
-        print("\n⚠️  Библиотека scikit-learn не установлена.")
+        print("\nБиблиотека scikit-learn не установлена.")
         print("Установите её для сравнения: pip install scikit-learn")
     except Exception as e:
-        print(f"\n⚠️  Ошибка при сравнении: {e}")
+        print(f"\nОшибка при сравнении: {e}")
 
 
 def analyze_document(extractor: KeywordExtractor, doc_index: int) -> None:
@@ -216,7 +295,7 @@ def search_word_interactive(extractor: KeywordExtractor) -> None:
             continue
 
         print(
-            f"\nНайдено {len(matching_docs)}"
+            f"\nНайдено {len(matching_docs)} "
             f"документов со словом '{user_input}':"
         )
 
