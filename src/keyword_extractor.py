@@ -73,6 +73,7 @@ class KeywordExtractor:
 
     def _initialize_stopwords(self) -> None:
         """Инициализирует множество стоп-слов."""
+        logger.info("Загрузка стоп-слов...")
         try:
             from nltk.corpus import stopwords
             nltk.download('stopwords', quiet=True)
@@ -80,7 +81,7 @@ class KeywordExtractor:
         except (ImportError, LookupError):
             # Простой набор стоп-слов на случай ошибки
             self.stop_words = {
-                'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 
+                'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at',
                 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were',
                 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does',
                 'did', 'will', 'would', 'shall', 'should', 'may', 'might',
@@ -108,7 +109,7 @@ class KeywordExtractor:
             tokens = [
                 token for token in tokens if token not in self.stop_words
             ]
-        
+
         return tokens
 
     def build_vocabulary(self) -> None:

@@ -205,7 +205,7 @@ def compare_with_sklearn(
 
         # Объяснение различий
         print("\n" + "=" * 60)
-        print("ПОЧЕМУ РЕЗУЛЬТАТЫ РАЗЛИЧАЮТСЯ:")
+        print("ПОЧЕМУ РЕЗУЛЬТАТЫ МОГУТ РАЗЛИЧАТЬСЯ:")
         print("=" * 60)
         print("1. Формула IDF:")
         print("   • Ручная реализация: idf = log(N / df)")
@@ -277,78 +277,153 @@ def analyze_document(extractor: KeywordExtractor, doc_index: int) -> None:
 
 
 def search_word_interactive(extractor: KeywordExtractor) -> None:
-    """Интерактивный поиск документов по слову."""
+    """Интерактивный поиск документов по слову с пагинацией."""
     print("\n" + "=" * 60)
     print("ПОИСК СТАТЕЙ ПО СЛОВУ")
     print("=" * 60)
 
+    # Переменные для пагинации
+    current_search_word = None
+    current_matching_docs = []
+    current_page = 0
+    docs_per_page = 10
+
     while True:
-        print("\nВведите слово для поиска (или 'назад' для возврата):")
-        user_input = input("> ").strip().lower()
+        # Если у нас нет текущего поискового запроса, запрашиваем новое слово
+        if not current_search_word:
+            print(
+                "\nВведите слово для поиска "
+                "(или 'назад' для возврата в меню):"
+            )
+            user_input = input("> ").strip().lower()
 
-        # Проверяем команду возврата
-        if user_input == 'назад':
-            return
+            # Проверяем команду возврата
+            if user_input == 'назад':
+                return
 
-        # Проверяем, что введено не пустое слово
-        if not user_input:
-            print("Пожалуйста, введите слово для поиска.")
-            continue
+            # Проверяем, что введено не пустое слово
+            if not user_input:
+                print("Пожалуйста, введите слово для поиска.")
+                continue
 
-        # Ищем документы, содержащие это слово
-        matching_docs = extractor.find_documents_with_word(user_input)
+            # Ищем документы, содержащие это слово
+            matching_docs = extractor.find_documents_with_word(user_input)
 
-        if not matching_docs:
-            print(f"\nСлово '{user_input}' не найдено в документах.")
-            print("Попробуйте другое слово.")
-            continue
+            if not matching_docs:
+                print(f"\nСлово '{user_input}' не найдено в документах.")
+                print("Попробуйте другое слово.")
+                continue
 
+            # Сохраняем результаты поиска для пагинации
+            current_search_word = user_input
+            current_matching_docs = matching_docs
+            current_page = 0
+
+            print(f"\nНайдено {len(matching_docs)} "
+                  f"документов со словом '{user_input}':")
+
+        # Вычисляем диапазон документов для текущей страницы
+        total_pages = (len(current_matching_docs) - 1) // docs_per_page + 1
+        start_idx = current_page * docs_per_page
+        end_idx = min(start_idx + docs_per_page, len(current_matching_docs))
+
+        # Показываем информацию о текущей странице
+        print(f"\nСтраница {current_page + 1} из {total_pages}:")
         print(
-            f"\nНайдено {len(matching_docs)} "
-            f"документов со словом '{user_input}':"
+            f"Документы {start_idx + 1}-{end_idx} "
+            f"из {len(current_matching_docs)}"
         )
 
-        # Показываем найденные документы
-        # Ограничим показ 10 документами
-        for i, doc_idx in enumerate(matching_docs[:10]):
+        # Показываем найденные документы для текущей страницы
+        for i, doc_idx in enumerate(
+            current_matching_docs[start_idx:end_idx], 1
+        ):
             # Получаем информацию о документе
             label = extractor.df.iloc[doc_idx]['labels']
             preview = extractor.get_document_preview(doc_idx, 80)
 
             # Форматируем вывод
-            print(f"\n[{i+1}] Документ #{doc_idx} (Тема: {label})")
+            print(f"\n[{i}] Документ #{doc_idx} (Тема: {label})")
             print(f"    {preview}")
 
-        # Если документов больше 10, сообщаем об этом
-        if len(matching_docs) > 10:
-            print(f"\n... и еще {len(matching_docs) - 10} документов")
+        # Показываем доступные команды
+        print("\n" + "-" * 60)
+        print("Доступные команды:")
+        print("• [1-10] - выбрать документ для анализа")
 
-        # Предлагаем выбрать документ для анализа
-        print(
-            "\nВведите номер документа для анализа"
-            "(1-10) или 'пропустить' для нового поиска:"
-        )
-        choice = input("> ").strip().lower()
+        if current_page < total_pages - 1:
+            print("• 'далее' - следующая страница")
 
-        if choice == 'пропустить':
+        if current_page > 0:
+            print("• 'предыдущая' - предыдущая страница")
+
+        print("• 'новый' - новый поиск")
+        print("• 'назад' - вернуться в меню")
+        print("-" * 60)
+
+        # Запрашиваем выбор пользователя
+        choice = input("\nВаш выбор: ").strip().lower()
+
+        # Обработка команды "далее"
+        if choice == 'далее':
+            if current_page < total_pages - 1:
+                current_page += 1
+            else:
+                print("Это последняя страница.")
             continue
 
-        try:
-            choice_num = int(choice)
-            if 1 <= choice_num <= min(10, len(matching_docs)):
-                # Получаем индекс выбранного документа
-                selected_doc_idx = matching_docs[choice_num - 1]
-
-                # Анализируем документ
-                analyze_document(extractor, selected_doc_idx)
-
-                # После анализа возвращаемся к поиску
-                print("\nНажмите Enter для продолжения поиска...")
-                input()
+        # Обработка команды "предыдущая"
+        elif choice == 'предыдущая':
+            if current_page > 0:
+                current_page -= 1
             else:
-                print("Неверный номер. Пожалуйста, выберите номер из списка.")
-        except ValueError:
-            print("Пожалуйста, введите номер или 'пропустить'.")
+                print("Это первая страница.")
+            continue
+
+        # Обработка команды "новый"
+        elif choice == 'новый':
+            current_search_word = None
+            current_matching_docs = []
+            current_page = 0
+            continue
+
+        # Обработка команды "назад"
+        elif choice == 'назад':
+            return
+
+        # Обработка выбора документа по номеру
+        else:
+            try:
+                choice_num = int(choice)
+                if 1 <= choice_num <= docs_per_page:
+                    # Вычисляем фактический индекс в списке matching_docs
+                    actual_idx = start_idx + (choice_num - 1)
+
+                    if actual_idx < len(current_matching_docs):
+                        # Получаем индекс выбранного документа
+                        selected_doc_idx = current_matching_docs[actual_idx]
+
+                        # Анализируем документ
+                        analyze_document(extractor, selected_doc_idx)
+
+                        # После анализа возвращаемся к той же странице
+                        print("\nНажмите Enter для продолжения...")
+                        input()
+                    else:
+                        print(
+                            f"Документ #{choice_num} "
+                            "недоступен на этой странице."
+                        )
+                else:
+                    print(
+                        "Пожалуйста, введите число от "
+                        f"1 до {docs_per_page} или команду."
+                    )
+            except ValueError:
+                print(
+                    "Неверный ввод. Пожалуйста, "
+                    "используйте одну из доступных команд."
+                )
 
 
 def main() -> None:
