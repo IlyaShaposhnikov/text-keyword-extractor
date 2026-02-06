@@ -26,7 +26,7 @@ cd text-keyword-extractor
 pip install -r requirements.txt
 ```
 
-3. Скачайте данные с [Kaggle](https://www.kaggle.com/datasets/abdulraffayali/bbc-text-cls) и поместите файл `bbc-text-cls.csv` в папку `data/`
+3. Скачайте датасет с [Kaggle](https://www.kaggle.com/datasets/abdulraffayali/bbc-text-cls) и поместите файл `bbc-text-cls.csv` в папку `data/`
 
 ## Использование
 ```python

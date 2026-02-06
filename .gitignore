@@ -35,7 +35,9 @@ env/
 # Data
 data/
 
-
 # OS
 .DS_Store
 Thumbs.db
+
+# Debug
+run.py
