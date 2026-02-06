@@ -62,119 +62,6 @@ def initialize_extractor() -> KeywordExtractor:
         sys.exit(1)
 
 
-def search_word_interactive(extractor: KeywordExtractor) -> None:
-    """Интерактивный поиск документов по слову."""
-    print("\n" + "=" * 60)
-    print("ПОИСК СТАТЕЙ ПО СЛОВУ")
-    print("=" * 60)
-
-    while True:
-        print("\nВведите слово для поиска (или 'назад' для возврата):")
-        user_input = input("> ").strip().lower()
-
-        # Проверяем команду возврата
-        if user_input == 'назад':
-            return
-
-        # Проверяем, что введено не пустое слово
-        if not user_input:
-            print("Пожалуйста, введите слово для поиска.")
-            continue
-
-        # Ищем документы, содержащие это слово
-        matching_docs = extractor.find_documents_with_word(user_input)
-
-        if not matching_docs:
-            print(f"\nСлово '{user_input}' не найдено в документах.")
-            print("Попробуйте другое слово.")
-            continue
-
-        print(
-            f"\nНайдено {len(matching_docs)}"
-            f"документов со словом '{user_input}':"
-        )
-
-        # Показываем найденные документы
-        # Ограничим показ 10 документами
-        for i, doc_idx in enumerate(matching_docs[:10]):
-            # Получаем информацию о документе
-            label = extractor.df.iloc[doc_idx]['labels']
-            preview = extractor.get_document_preview(doc_idx, 80)
-
-            # Форматируем вывод
-            print(f"\n[{i+1}] Документ #{doc_idx} (Тема: {label})")
-            print(f"    {preview}")
-
-        # Если документов больше 10, сообщаем об этом
-        if len(matching_docs) > 10:
-            print(f"\n... и еще {len(matching_docs) - 10} документов")
-
-        # Предлагаем выбрать документ для анализа
-        print(
-            "\nВведите номер документа для анализа"
-            "(1-10) или 'пропустить' для нового поиска:"
-        )
-        choice = input("> ").strip().lower()
-
-        if choice == 'пропустить':
-            continue
-
-        try:
-            choice_num = int(choice)
-            if 1 <= choice_num <= min(10, len(matching_docs)):
-                # Получаем индекс выбранного документа
-                selected_doc_idx = matching_docs[choice_num - 1]
-
-                # Анализируем документ
-                analyze_document(extractor, selected_doc_idx)
-
-                # После анализа возвращаемся к поиску
-                print("\nНажмите Enter для продолжения поиска...")
-                input()
-            else:
-                print("Неверный номер. Пожалуйста, выберите номер из списка.")
-        except ValueError:
-            print("Пожалуйста, введите номер или 'пропустить'.")
-
-
-def analyze_document(extractor: KeywordExtractor, doc_index: int) -> None:
-    """Анализирует документ и показывает ключевые слова."""
-    print("\n" + "=" * 60)
-    print(f"АНАЛИЗ ДОКУМЕНТА #{doc_index}")
-    print("=" * 60)
-
-    # Получаем информацию о документе
-    doc_row = extractor.df.iloc[doc_index]
-    label = doc_row['labels']
-    text_preview = extractor.get_document_preview(doc_index, 200)
-
-    print(f"\nТема: {label}")
-    print("\nСодержание:")
-    print(f"{text_preview}")
-
-    # Извлекаем ключевые слова
-    print("\nИзвлечение ключевых слов...")
-    keywords = extractor.extract_keywords(doc_index, top_n=10)
-
-    print("\nТОП-10 ключевых слов (с TF-IDF весами):")
-    print("-" * 40)
-
-    # Выводим ключевые слова в формате таблицы
-    print(f"{'№':<3} {'Слово':<20} {'TF-IDF':<10}")
-    print("-" * 40)
-
-    for i, (word, weight) in enumerate(keywords, 1):
-        print(f"{i:<3} {word:<20} {weight:<10.4f}")
-
-    # Предлагаем сравнить со встроенной реализацией TF-IDF
-    print("\n" + "-" * 60)
-    print("Сравнить с встроенной реализацией TF-IDF? (да/нет)")
-    compare_choice = input("> ").strip().lower()
-
-    if compare_choice == 'да':
-        compare_with_sklearn(extractor, doc_index, keywords)
-
-
 def compare_with_sklearn(
         extractor: KeywordExtractor, doc_index: int, extractor_keywords: list
 ) -> None:
@@ -261,6 +148,119 @@ def compare_with_sklearn(
         print("Установите её для сравнения: pip install scikit-learn")
     except Exception as e:
         print(f"\n⚠️  Ошибка при сравнении: {e}")
+
+
+def analyze_document(extractor: KeywordExtractor, doc_index: int) -> None:
+    """Анализирует документ и показывает ключевые слова."""
+    print("\n" + "=" * 60)
+    print(f"АНАЛИЗ ДОКУМЕНТА #{doc_index}")
+    print("=" * 60)
+
+    # Получаем информацию о документе
+    doc_row = extractor.df.iloc[doc_index]
+    label = doc_row['labels']
+    text_preview = extractor.get_document_preview(doc_index, 200)
+
+    print(f"\nТема: {label}")
+    print("\nСодержание:")
+    print(f"{text_preview}")
+
+    # Извлекаем ключевые слова
+    print("\nИзвлечение ключевых слов...")
+    keywords = extractor.extract_keywords(doc_index, top_n=10)
+
+    print("\nТОП-10 ключевых слов (с TF-IDF весами):")
+    print("-" * 40)
+
+    # Выводим ключевые слова в формате таблицы
+    print(f"{'№':<3} {'Слово':<20} {'TF-IDF':<10}")
+    print("-" * 40)
+
+    for i, (word, weight) in enumerate(keywords, 1):
+        print(f"{i:<3} {word:<20} {weight:<10.4f}")
+
+    # Предлагаем сравнить со встроенной реализацией TF-IDF
+    print("\n" + "-" * 60)
+    print("Сравнить с встроенной реализацией TF-IDF? (да/нет)")
+    compare_choice = input("> ").strip().lower()
+
+    if compare_choice == 'да':
+        compare_with_sklearn(extractor, doc_index, keywords)
+
+
+def search_word_interactive(extractor: KeywordExtractor) -> None:
+    """Интерактивный поиск документов по слову."""
+    print("\n" + "=" * 60)
+    print("ПОИСК СТАТЕЙ ПО СЛОВУ")
+    print("=" * 60)
+
+    while True:
+        print("\nВведите слово для поиска (или 'назад' для возврата):")
+        user_input = input("> ").strip().lower()
+
+        # Проверяем команду возврата
+        if user_input == 'назад':
+            return
+
+        # Проверяем, что введено не пустое слово
+        if not user_input:
+            print("Пожалуйста, введите слово для поиска.")
+            continue
+
+        # Ищем документы, содержащие это слово
+        matching_docs = extractor.find_documents_with_word(user_input)
+
+        if not matching_docs:
+            print(f"\nСлово '{user_input}' не найдено в документах.")
+            print("Попробуйте другое слово.")
+            continue
+
+        print(
+            f"\nНайдено {len(matching_docs)}"
+            f"документов со словом '{user_input}':"
+        )
+
+        # Показываем найденные документы
+        # Ограничим показ 10 документами
+        for i, doc_idx in enumerate(matching_docs[:10]):
+            # Получаем информацию о документе
+            label = extractor.df.iloc[doc_idx]['labels']
+            preview = extractor.get_document_preview(doc_idx, 80)
+
+            # Форматируем вывод
+            print(f"\n[{i+1}] Документ #{doc_idx} (Тема: {label})")
+            print(f"    {preview}")
+
+        # Если документов больше 10, сообщаем об этом
+        if len(matching_docs) > 10:
+            print(f"\n... и еще {len(matching_docs) - 10} документов")
+
+        # Предлагаем выбрать документ для анализа
+        print(
+            "\nВведите номер документа для анализа"
+            "(1-10) или 'пропустить' для нового поиска:"
+        )
+        choice = input("> ").strip().lower()
+
+        if choice == 'пропустить':
+            continue
+
+        try:
+            choice_num = int(choice)
+            if 1 <= choice_num <= min(10, len(matching_docs)):
+                # Получаем индекс выбранного документа
+                selected_doc_idx = matching_docs[choice_num - 1]
+
+                # Анализируем документ
+                analyze_document(extractor, selected_doc_idx)
+
+                # После анализа возвращаемся к поиску
+                print("\nНажмите Enter для продолжения поиска...")
+                input()
+            else:
+                print("Неверный номер. Пожалуйста, выберите номер из списка.")
+        except ValueError:
+            print("Пожалуйста, введите номер или 'пропустить'.")
 
 
 def main() -> None:
