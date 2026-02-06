@@ -24,7 +24,7 @@ class KeywordExtractor:
     Реализует алгоритм TF-IDF с нуля.
     """
 
-    def __init__(self):
+    def __init__(self, remove_stopwords: bool = True):
         """Инициализация KeywordExtractor.        """
         # Используем константу для пути к данным
         self.data_path = DEFAULT_DATA_PATH
@@ -43,6 +43,14 @@ class KeywordExtractor:
         self.tf_idf_matrix = None
         # Токенизированные документы
         self.tokenized_docs = None
+        # Флаг удаления стоп-слов
+        self.remove_stopwords = remove_stopwords
+        # Множество стоп-слов
+        self.stop_words = set()
+
+        # Инициализируем стоп-слова если нужно
+        if self.remove_stopwords:
+            self._initialize_stopwords()
 
         # Загружаем необходимые ресурсы NLTK при инициализации
         try:
@@ -63,6 +71,24 @@ class KeywordExtractor:
         # Логируем успешную загрузку
         logger.info(f"Загружено {len(self.df)} документов")
 
+    def _initialize_stopwords(self) -> None:
+        """Инициализирует множество стоп-слов."""
+        try:
+            from nltk.corpus import stopwords
+            nltk.download('stopwords', quiet=True)
+            self.stop_words = set(stopwords.words('english'))
+        except (ImportError, LookupError):
+            # Простой набор стоп-слов на случай ошибки
+            self.stop_words = {
+                'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 
+                'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were',
+                'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does',
+                'did', 'will', 'would', 'shall', 'should', 'may', 'might',
+                'must', 'can', 'could', 'i', 'you', 'he', 'she', 'it',
+                'we', 'they', 'me', 'him', 'her', 'us', 'them'
+            }
+        logger.info(f"Загружено {len(self.stop_words)} стоп-слов")
+
     def preprocess_text(self, text: str) -> List[str]:
         """Предварительная обработка текста."""
         # Приводим к нижнему регистру
@@ -77,6 +103,12 @@ class KeywordExtractor:
         # Фильтруем короткие слова
         tokens = [token for token in tokens if len(token) > 2]
 
+        # Удаляем стоп-слова если включен флаг
+        if self.remove_stopwords and self.stop_words:
+            tokens = [
+                token for token in tokens if token not in self.stop_words
+            ]
+        
         return tokens
 
     def build_vocabulary(self) -> None:
