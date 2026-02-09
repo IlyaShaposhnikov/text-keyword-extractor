@@ -68,52 +68,20 @@ def compare_with_sklearn(
     """Сравнивает ручную реализацию TF-IDF со встроенной из sklearn."""
     try:
         from sklearn.feature_extraction.text import TfidfVectorizer
+        import numpy as np
 
-        print("\nСравнение с sklearn TF-IDF...")
+        print("\n" + "=" * 60)
+        print("СРАВНИТЕЛЬНЫЙ АНАЛИЗ TF-IDF РЕАЛИЗАЦИЙ")
+        print("=" * 60)
 
         # Получаем все тексты
         all_texts = extractor.df['text'].tolist()
 
-        # Используем sklearn с параметрами, которые
-        # максимально приближены к ручной реализации
-        # Создаем векторайзер
-        sklearn_vectorizer = TfidfVectorizer(
-            lowercase=True,
-            tokenizer=extractor.preprocess_text,
-            # Отключаем стандартную токенизацию
-            token_pattern=None,
-            # Отключаем сглаживание IDF
-            smooth_idf=False,
-            # Отключаем нормализацию L2
-            norm=None,
-            # Используем обычную TF
-            sublinear_tf=False,
-            # Минимальная длина документа для DF
-            min_df=1,
-            # Максимальная DF (все документы)
-            max_df=1.0
-        )
+        # 1. РУЧНАЯ РЕАЛИЗАЦИЯ
+        manual_keywords = extractor_keywords
 
-        # Обучаем векторайзер
-        sklearn_tfidf_matrix = sklearn_vectorizer.fit_transform(all_texts)
-        # Получаем TF-IDF веса для выбранного документа
-        sklearn_doc_tfidf = sklearn_tfidf_matrix[doc_index]
-        # Получаем названия признаков (слов)
-        sklearn_feature_names = sklearn_vectorizer.get_feature_names_out()
-
-        # Сортируем слова по TF-IDF весу
-        sklearn_sorted_indices = sklearn_doc_tfidf.toarray()[0].argsort()[::-1]
-
-        # Берем топ-10 слов из sklearn
-        sklearn_keywords = []
-        for idx in sklearn_sorted_indices[:10]:
-            word = sklearn_feature_names[idx]
-            weight = sklearn_doc_tfidf[0, idx]
-            sklearn_keywords.append((word, weight))
-
-        # Сравнение с sklearn с настройками по умолчанию
-        # Создаем векторайзер
-        default_vectorizer = TfidfVectorizer(
+        # 2. SKLEARN ПО УМОЛЧАНИЮ
+        sklearn_default = TfidfVectorizer(
             lowercase=True,
             tokenizer=extractor.preprocess_text,
             # Отключаем стандартную токенизацию
@@ -121,63 +89,85 @@ def compare_with_sklearn(
         )
 
         # Обучаем векторайзер
-        default_tfidf = default_vectorizer.fit_transform(all_texts)
-        # Получаем TF-IDF веса для выбранного документа
-        default_doc_tfidf = default_tfidf[doc_index]
+        sklearn_matrix = sklearn_default.fit_transform(all_texts)
         # Получаем названия признаков (слов)
-        default_features = default_vectorizer.get_feature_names_out()
+        sklearn_features = sklearn_default.get_feature_names_out()
+        # Получаем TF-IDF веса для выбранного документа
+        sklearn_doc_weights = sklearn_matrix[doc_index].toarray()[0]
+
         # Сортируем слова по TF-IDF весу
-        default_sorted_indices = default_doc_tfidf.toarray()[0].argsort()[::-1]
+        sklearn_sorted = np.argsort(sklearn_doc_weights)[::-1][:10]
+        sklearn_keywords = []
+        for idx in sklearn_sorted:
+            word = sklearn_features[idx]
+            weight = sklearn_doc_weights[idx]
+            sklearn_keywords.append((word, weight))
 
-        # Берем топ-10 слов из sklearn с настройками по умолчанию
-        default_keywords = []
-        for idx in default_sorted_indices[:10]:
-            word = default_features[idx]
-            weight = default_doc_tfidf[0, idx]
-            default_keywords.append((word, weight))
+        print("\n1. Ручная реализация:")
+        print("   IDF = log(N / df)")
+        print("   Без нормализации")
+        print("   Стоп-слова имеют вес ~0")
 
-        # Выводим сравнение в одной таблице с тремя столбцами
-        print("\n" + "=" * 80)
-        print("СРАВНЕНИЕ ТРЕХ РЕАЛИЗАЦИЙ TF-IDF")
-        print("=" * 80)
+        print("\n2. Sklearn:")
+        print("   IDF = log((1 + N) / (1 + df)) + 1")
+        print("   L2 нормализация")
+        print("   Сглаживание IDF")
 
-        # Заголовки столбцов
-        extractor_header = "Ручная реализация"
-        sklearn_header = "Sklearn (настроенный)"
-        default_header = "Sklearn (по умолчанию)"
+        # Для наглядности выведем разницу в весах для одинаковых слов
+        print("\n" + "=" * 60)
+        print("СРАВНЕНИЕ ВЕСОВ ОДИНАКОВЫХ СЛОВ:")
+        print("=" * 60)
 
-        # Определяем максимальную ширину для выравнивания
-        column_width = 25
+        # Создаем словарь весов sklearn для быстрого доступа
+        sklearn_weights = {word: weight for word, weight in sklearn_keywords}
 
-        print(f"\n{extractor_header:<{column_width}} "
-              f"{sklearn_header:<{column_width}} "
-              f"{default_header:<{column_width}}")
+        print(
+            f"\n{'Слово':<20} {'Вес':<12} "
+            f"{'Sklearn вес':<12} {'Отношение':<12}"
+        )
+        print("-" * 56)
 
-        # Разделители
-        print(f"{'-'*column_width:<{column_width}} "
-              f"{'-'*column_width:<{column_width}} "
-              f"{'-'*column_width:<{column_width}}")
+        # Берем топ-5 слов из нашей реализации и ищем их в sklearn
+        for manual_word, manual_weight in manual_keywords[:5]:
+            sklearn_weight = sklearn_weights.get(manual_word, 0)
+            if sklearn_weight > 0:
+                ratio = (
+                    manual_weight / sklearn_weight
+                    if sklearn_weight != 0
+                    else float('inf')
+                )
+                print(
+                    f"{manual_word:<20} {manual_weight:<12.4f} "
+                    f"{sklearn_weight:<12.4f} {ratio:<12.2f}"
+                )
 
-        # Выводим топ-10 ключевых слов для каждой реализации
+        # 4. ВЫВОДИМ ДВА СТОЛБЦА С ПРИМЕЧАНИЯМИ
+        print("\n" + "=" * 60)
+        print("ТОП-10 КЛЮЧЕВЫХ СЛОВ:")
+        print("=" * 60)
+
+        print(f"\n{'Ручная реализация':<30} {'Sklearn':<30}")
+        print(f"{'-'*30:<30} {'-'*30:<30}")
+
         for i in range(10):
             # Ручная реализация
-            extractor_word = (
-                extractor_keywords[i][0]
-                if i < len(extractor_keywords)
-                else ""
+            manual_word = (
+                manual_keywords[i][0]
+                if i < len(manual_keywords)
+                else "—"
             )
-            extractor_weight = (
-                extractor_keywords[i][1]
-                if i < len(extractor_keywords)
+            manual_weight = (
+                manual_keywords[i][1]
+                if i < len(manual_keywords)
                 else 0
             )
-            extractor_str = f"{extractor_word} ({extractor_weight:.4f})"
+            manual_str = f"{manual_word} ({manual_weight:.4f})"
 
-            # Sklearn с настроенными параметрами
+            # Sklearn
             sklearn_word = (
                 sklearn_keywords[i][0]
                 if i < len(sklearn_keywords)
-                else ""
+                else "—"
             )
             sklearn_weight = (
                 sklearn_keywords[i][1]
@@ -186,50 +176,95 @@ def compare_with_sklearn(
             )
             sklearn_str = f"{sklearn_word} ({sklearn_weight:.4f})"
 
-            # Sklearn по умолчанию
-            default_word = (
-                default_keywords[i][0]
-                if i < len(default_keywords)
-                else ""
-            )
-            default_weight = (
-                default_keywords[i][1]
-                if i < len(default_keywords)
-                else 0
-            )
-            default_str = f"{default_word} ({default_weight:.4f})"
+            # Подсветим различия
+            if (
+                manual_word != sklearn_word
+                and manual_word != "—"
+                and sklearn_word != "—"
+            ):
+                manual_str = f"*{manual_str}"
+                sklearn_str = f"*{sklearn_str}"
 
-            print(f"{i+1:2}. {extractor_str:<{column_width}} "
-                  f"{sklearn_str:<{column_width}} "
-                  f"{default_str:<{column_width}}")
+            print(f"{i+1:2}. {manual_str:<30} {sklearn_str:<30}")
 
-        # Объяснение различий
+        # 5. ПОКАЗЫВАЕМ РАЗНИЦУ В ФОРМУЛАХ НА КОНКРЕТНОМ ПРИМЕРЕ
         print("\n" + "=" * 60)
-        print("ПОЧЕМУ РЕЗУЛЬТАТЫ МОГУТ РАЗЛИЧАТЬСЯ:")
+        print("ПОЧЕМУ ВЕСА РАЗНЫЕ? РАЗБОР НА ПРИМЕРЕ:")
         print("=" * 60)
-        print("1. Формула IDF:")
-        print("   • Ручная реализация: idf = log(N / df)")
-        print("   • Sklearn (по умолчанию): idf = log((1 + N) / (1 + df)) + 1")
-        print("   • Sklearn (smooth_idf=False): idf = log(N / df) + 1")
-        print("\n2. Нормализация:")
-        print("   • Ручная реализация: нет нормализации")
-        print("   • Sklearn (по умолчанию): L2 нормализация")
-        print("\n3. Обработка TF:")
-        print("   • Ручная реализация: raw counts")
-        print("   • Sklearn (по умолчанию): raw counts")
-        print("   • Sklearn (sublinear_tf=True): 1 + log(TF)")
-        print("\n4. Удаление стоп-слов:")
-        print("   • Все реализации используют одинаковый препроцессинг")
-        print("   • Удаляются слова короче 3 символов")
-        print("   • Удаляются стандартные английские стоп-слова")
 
-        # Сравнение с исправленной формулой IDF (без +1)
-        print("\n" + "=" * 60)
-        print("ВАЖНОЕ ЗАМЕЧАНИЕ:")
+        # Найдем слово, которое есть в обоих списках
+        common_words = set(
+            word for word, _ in manual_keywords[:5]
+        ).intersection(
+            set(word for word, _ in sklearn_keywords[:5])
+        )
+
+        if common_words:
+            example_word = next(iter(common_words))
+
+            # Получаем TF из матрицы
+            if example_word in extractor.word2idx:
+                word_idx = extractor.word2idx[example_word]
+
+                # Ручная реализация
+                manual_tf = extractor.tf_matrix[doc_index, word_idx]
+                manual_df = np.sum(extractor.tf_matrix[:, word_idx] > 0)
+                manual_idf = extractor.idf_vector[word_idx]
+                manual_tfidf = manual_tf * manual_idf
+
+                # Sklearn
+                print(f"\nСлово: '{example_word}'")
+                print("\nРУЧНАЯ РЕАЛИЗАЦИЯ:")
+                print(f"  TF: {manual_tf:.0f}")
+                print(f"  DF: {manual_df:.0f}")
+                print(
+                    f"  IDF = log(N / df) = log({len(extractor.df)} "
+                    f"/ {manual_df}) = {manual_idf:.4f}"
+                )
+                print(
+                    f"  TF-IDF = TF × IDF = {manual_tf:.0f} × "
+                    f"{manual_idf:.4f} = {manual_tfidf:.4f}"
+                )
+
+                print("\nSKLEARN:")
+                print(f"  TF: {manual_tf:.0f}")
+                print(f"  DF: {manual_df:.0f}")
+                print(
+                    "  IDF = log((1 + N) / (1 + df)) + 1 = "
+                    f"log((1 + {len(extractor.df)}) / (1 + {manual_df})) + 1"
+                )
+                sklearn_idf_val = (
+                    np.log((1 + len(extractor.df)) / (1 + manual_df)) + 1
+                )
+                print(f"  IDF = {sklearn_idf_val:.4f}")
+                print(
+                    f"  TF-IDF (до нормализации) = {manual_tf:.0f} × "
+                    f"{sklearn_idf_val:.4f} = "
+                    f"{manual_tf * sklearn_idf_val:.4f}"
+                )
+                print(
+                    "  После L2 нормализации: ~"
+                    f"{sklearn_weights.get(example_word, 0):.4f}"
+                )
+
+        # 6. ВЫВОДЫ
         print("=" * 60)
-        print("Sklearn добавляет +1 к IDF даже при smooth_idf=False")
-        print("Это означает, что даже стоп-слова получают ненулевой вес!")
-        print("В ручной реализации стоп-слова имеют вес близкий к 0")
+        print("\nРучная реализация лучше для:")
+        print("   • Чистой математики TF-IDF")
+        print("   • Нулевых весов у стоп-слов")
+        print("   • Прозрачности расчетов")
+
+        print("\nSklearn лучше для:")
+        print("   • Устойчивости к нулевым значениям")
+        print("   • Нормализованных векторов")
+        print("   • Совместимости с другими алгоритмами sklearn")
+
+        print("\nВывод: Обе реализации имеют свои преимущества.")
+        print("Ручная реализация - 'чистый' TF-IDF.")
+        print(
+            "Sklearn - производственная версия "
+            "с дополнительной стабильностью."
+        )
 
     except ImportError:
         print("\nБиблиотека scikit-learn не установлена.")
